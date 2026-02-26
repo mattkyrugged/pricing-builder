@@ -209,7 +209,8 @@ export default function Builder() {
     const w = window.open('', '_blank');
     w.document.write(html);
     w.document.close();
-    setTimeout(() => w.print(), 500);
+    w.onload = () => w.print();
+    setTimeout(() => { try { w.print(); } catch(e) {} }, 800);
   }
 
   function handleFileImport(e) {
@@ -345,30 +346,37 @@ export default function Builder() {
 
   function generatePrintHTML() {
     const c = config;
+    const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
     const sectionsHTML = c.sections.map(s => {
-      const rows = s.items.filter(i => i.name).map(item => `
-        <tr>
-          <td style="padding:6px 10px;border-bottom:1px solid #E2E8F0;font-size:11px;font-family:monospace">${item.sku}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #E2E8F0;font-size:11px">${item.name}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #E2E8F0;text-align:right;font-size:11px;font-weight:600">$${(+item.price).toFixed(2)}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #E2E8F0;text-align:right;font-size:11px;color:${c.commissionColor};font-weight:600">${(+item.commission) > 0 ? '$' + (+item.commission).toFixed(2) : 'Contact'}</td>
-          <td style="padding:6px 10px;border-bottom:1px solid #E2E8F0;text-align:right;font-size:11px;font-weight:600">$${(+item.price - +item.commission).toFixed(2)}</td>
+      const validItems = s.items.filter(i => i.name);
+      if (validItems.length === 0) return '';
+
+      const rows = validItems.map((item, idx) => `
+        <tr style="background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFBFC'}">
+          <td style="padding:5pt 10pt;font-size:9pt;font-family:'Courier New',monospace;color:#334155;border-bottom:1px solid #EEF1F5">${item.sku}</td>
+          <td style="padding:5pt 10pt;font-size:9pt;color:#1E293B;border-bottom:1px solid #EEF1F5">${item.name}</td>
+          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:600;color:#1E293B;border-bottom:1px solid #EEF1F5">$${(+item.price).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:600;color:${c.commissionColor};border-bottom:1px solid #EEF1F5">${(+item.commission) > 0 ? '$' + (+item.commission).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'}</td>
+          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:700;color:#0F1A2E;border-bottom:1px solid #EEF1F5">$${(+item.price - +item.commission).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
         </tr>
       `).join('');
 
       return `
-        <div style="margin-bottom:16px;break-inside:avoid">
-          <div style="background:${c.headerBg};color:white;padding:8px 12px;font-size:13px;font-weight:700;border-radius:4px 4px 0 0">
-            ${s.title}${s.subtitle ? ` <span style="font-weight:400;font-size:11px;opacity:0.8">— ${s.subtitle}</span>` : ''}
-          </div>
-          <table style="width:100%;border-collapse:collapse;border:1px solid #E2E8F0;border-top:none">
+        <div class="section-block">
+          <table style="width:100%;border-collapse:collapse;margin-bottom:14pt">
             <thead>
-              <tr style="background:#F8FAFC">
-                <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0;width:100px">SKU</th>
-                <th style="padding:6px 10px;text-align:left;font-size:10px;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0">ITEM</th>
-                <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0;width:90px">PRICE</th>
-                <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:${c.commissionColor};border-bottom:1px solid #E2E8F0;width:90px">COMMISSION</th>
-                <th style="padding:6px 10px;text-align:right;font-size:10px;font-weight:600;color:#64748B;border-bottom:1px solid #E2E8F0;width:90px">NET OWED</th>
+              <tr>
+                <th colspan="5" style="background:${c.headerBg};color:#FFFFFF;padding:6pt 10pt;font-size:10pt;font-weight:700;text-align:left;letter-spacing:0.3pt">
+                  ${s.title}${s.subtitle ? '<span style="font-weight:400;font-size:8pt;opacity:0.8;margin-left:8pt">\u2014 ' + s.subtitle + '</span>' : ''}
+                </th>
+              </tr>
+              <tr style="background:#F1F5F9">
+                <th style="padding:4pt 10pt;text-align:left;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:16%">SKU</th>
+                <th style="padding:4pt 10pt;text-align:left;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1">Description</th>
+                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Customer Price</th>
+                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:${c.commissionColor};text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Your Commission</th>
+                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Net Owed</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -378,30 +386,81 @@ export default function Builder() {
     }).join('');
 
     const formulaBox = c.showFormula ? `
-      <div style="background:#F8FAFC;border:2px solid ${c.accentColor};border-radius:6px;padding:12px 16px;margin:16px 0;text-align:center">
-        <div style="font-size:11px;color:#64748B;margin-bottom:4px">HOW PARTNER BILLING WORKS</div>
-        <div style="font-size:14px;font-weight:700;color:${c.primaryColor}">
-          Customer Invoice Price − <span style="color:${c.commissionColor}">Your Commission</span> = Net Owed to ${c.companyName.split(' ')[0]}
+      <table style="width:100%;margin-bottom:14pt"><tr><td style="padding:0">
+        <div style="border:1.5pt solid ${c.accentColor};padding:8pt 14pt;text-align:center;background:#FAFBFC">
+          <div style="font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:1pt;margin-bottom:3pt">How Partner Billing Works</div>
+          <div style="font-size:11pt;font-weight:700;color:${c.primaryColor}">
+            Customer Invoice Price &nbsp;\u2212&nbsp; <span style="color:${c.commissionColor}">Your Commission</span> &nbsp;=&nbsp; Net Owed to Company
+          </div>
         </div>
-      </div>
+      </td></tr></table>
     ` : '';
 
-    return `<!DOCTYPE html><html><head><title>${sheetName}</title>
-      <style>@page{size:letter;margin:0.4in}body{margin:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif}@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}</style>
-    </head><body style="padding:0.4in">
-      <div style="text-align:center;margin-bottom:8px">
-        <div style="background:${c.primaryColor};color:white;padding:16px;border-radius:8px">
-          <div style="font-size:10px;letter-spacing:2px;color:${c.accentColor};margin-bottom:4px">${c.badge}</div>
-          <div style="font-size:20px;font-weight:800;letter-spacing:1px">${c.companyName}</div>
-          <div style="font-size:14px;color:${c.accentColor};margin-top:4px;font-weight:600">${c.title}</div>
-          <div style="font-size:11px;color:#94A3B8;margin-top:2px">${c.subtitle}</div>
-        </div>
+    return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${sheetName}</title>
+  <style>
+    @page {
+      size: letter;
+      margin: 0.6in 0.65in 0.75in 0.65in;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      font-family: Calibri, 'Segoe UI', Arial, Helvetica, sans-serif;
+      font-size: 10pt;
+      color: #1E293B;
+      line-height: 1.4;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    @media screen {
+      body { background: #E2E8F0; padding: 20px; }
+      .page-wrap {
+        max-width: 8.5in; margin: 0 auto; background: white;
+        padding: 0.6in 0.65in 0.75in 0.65in;
+        box-shadow: 0 2px 20px rgba(0,0,0,0.15);
+        min-height: 11in;
+      }
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .page-wrap { padding: 0; box-shadow: none; min-height: auto; }
+      .no-print { display: none !important; }
+    }
+    table { page-break-inside: auto; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    thead { display: table-header-group; }
+    .section-block { page-break-inside: avoid; }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:center;padding:12px;background:#0F1A2E;position:sticky;top:0;z-index:10">
+    <button onclick="window.print()" style="background:#C9A96E;color:#0F1A2E;border:none;padding:10px 32px;font-size:13px;font-weight:700;border-radius:4px;cursor:pointer;margin-right:8px">
+      Print / Save as PDF
+    </button>
+    <button onclick="window.close()" style="background:transparent;color:#94A3B8;border:1px solid #475569;padding:10px 20px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer">
+      Close
+    </button>
+  </div>
+  <div class="page-wrap">
+    <table style="width:100%;margin-bottom:10pt"><tr><td style="padding:0">
+      <div style="background:${c.primaryColor};color:white;padding:16pt 20pt;text-align:center">
+        <div style="font-size:7pt;font-weight:700;letter-spacing:2.5pt;color:${c.accentColor};text-transform:uppercase;margin-bottom:3pt">${c.badge}</div>
+        <div style="font-size:16pt;font-weight:800;letter-spacing:0.5pt">${c.companyName}</div>
+        <div style="font-size:11pt;color:${c.accentColor};margin-top:4pt;font-weight:700">${c.title}</div>
+        <div style="font-size:8pt;color:#94A3B8;margin-top:2pt">${c.subtitle}</div>
       </div>
-      ${formulaBox}
-      ${sectionsHTML}
-      ${c.showGovernance ? `<div style="margin-top:16px;padding:10px;background:#F8FAFC;border-radius:4px;font-size:10px;color:#94A3B8;text-align:center">${c.governanceStatement}</div>` : ''}
-      <div style="margin-top:8px;text-align:center;font-size:10px;color:#CBD5E1">${c.footerText}</div>
-    </body></html>`;
+    </td></tr></table>
+    <div style="text-align:right;font-size:7.5pt;color:#94A3B8;margin-bottom:10pt">Prepared ${today}</div>
+    ${formulaBox}
+    ${sectionsHTML}
+    ${c.showGovernance ? `<div style="margin-top:14pt;padding:8pt 12pt;background:#F8FAFC;border-left:3pt solid ${c.accentColor};font-size:7.5pt;color:#94A3B8;line-height:1.5">${c.governanceStatement}</div>` : ''}
+    <div style="margin-top:10pt;padding-top:8pt;border-top:1pt solid #E2E8F0;text-align:center;font-size:7.5pt;color:#CBD5E1">${c.footerText}</div>
+  </div>
+</body>
+</html>`;
   }
 
   function toggleSection(idx) {
