@@ -37,6 +37,7 @@ export default function Builder() {
   const [showCatalogPicker, setShowCatalogPicker] = useState(null);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
+  const [viewMode, setViewMode] = useState('edit'); // 'edit' | 'preview'
   const importFileRef = useRef();
   const sheetIdRef = useRef(id || null);
   const saveTimerRef = useRef(null);
@@ -409,194 +410,281 @@ export default function Builder() {
 
   const fmt = (n) => '$' + (+n).toFixed(2);
 
-  if (!loaded) return <div><p>Loading sheet...</p></div>;
+  if (!loaded) return <div style={{ padding: 48, textAlign: 'center', color: 'var(--gray-400)' }}>Loading sheet...</div>;
+
+  const totalItems = config.sections.reduce((sum, s) => sum + s.items.filter(i => i.name).length, 0);
 
   return (
     <div>
-      <div className="page-header page-header-actions">
+      {/* Top bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button className="btn btn-outline btn-sm" onClick={() => navigate('/')} style={{ padding: '6px 10px' }}>←</button>
           <input
             type="text"
-            className="form-input"
             value={sheetName}
             onChange={e => setSheetName(e.target.value)}
-            style={{ fontSize: 20, fontWeight: 700, border: 'none', padding: 0, background: 'transparent', color: 'var(--navy)', width: 'auto', minWidth: 200 }}
+            style={{ fontSize: 22, fontWeight: 700, border: 'none', padding: 0, background: 'transparent', color: 'var(--navy)', outline: 'none', minWidth: 200 }}
           />
-          <span className="badge badge-gold" style={{ fontSize: 11 }}>
-            {saveStatus === 'saving' ? '⏳ Saving...' :
-             saveStatus === 'saved' ? '✓ Saved' :
-             saveStatus === 'error' ? '⚠ Save failed' :
-             sheetIdRef.current ? '✓ Saved' : 'Draft'}
+          <span style={{
+            fontSize: 11, fontWeight: 600, padding: '3px 10px', borderRadius: 12,
+            background: saveStatus === 'error' ? 'var(--red-light)' : saveStatus === 'saving' ? 'var(--gray-100)' : 'var(--green-light)',
+            color: saveStatus === 'error' ? 'var(--red)' : saveStatus === 'saving' ? 'var(--gray-500)' : 'var(--green)',
+          }}>
+            {saveStatus === 'saving' ? 'Saving...' : saveStatus === 'error' ? 'Save failed' : '✓ Saved'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => navigate('/')}>← Back</button>
-          <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>📄 Import File</button>
+          <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>📄 Import</button>
           <button className="btn btn-outline" onClick={exportPDF}>🖨 Print / PDF</button>
         </div>
       </div>
 
-      <div className="builder-layout">
-        {/* Sidebar editor */}
-        <div className="builder-sidebar">
-          <div className="card">
-            <div style={{ padding: '0 16px' }}>
-              <div className="tabs">
-                <button className={`tab ${activeTab === 'sections' ? 'active' : ''}`} onClick={() => setActiveTab('sections')}>Sections</button>
-                <button className={`tab ${activeTab === 'branding' ? 'active' : ''}`} onClick={() => setActiveTab('branding')}>Branding</button>
-                <button className={`tab ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>Settings</button>
-              </div>
+      {/* View toggle */}
+      <div style={{ display: 'flex', gap: 2, marginBottom: 20, background: 'var(--gray-200)', padding: 3, borderRadius: 8, width: 'fit-content' }}>
+        <button
+          onClick={() => setViewMode('edit')}
+          style={{
+            padding: '7px 20px', fontSize: 13, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+            background: viewMode === 'edit' ? 'var(--white)' : 'transparent',
+            color: viewMode === 'edit' ? 'var(--navy)' : 'var(--gray-500)',
+            boxShadow: viewMode === 'edit' ? 'var(--shadow-sm)' : 'none',
+          }}
+        >Edit</button>
+        <button
+          onClick={() => setViewMode('preview')}
+          style={{
+            padding: '7px 20px', fontSize: 13, fontWeight: 600, borderRadius: 6, border: 'none', cursor: 'pointer',
+            background: viewMode === 'preview' ? 'var(--white)' : 'transparent',
+            color: viewMode === 'preview' ? 'var(--navy)' : 'var(--gray-500)',
+            boxShadow: viewMode === 'preview' ? 'var(--shadow-sm)' : 'none',
+          }}
+        >Preview</button>
+      </div>
+
+      {/* EDIT MODE */}
+      {viewMode === 'edit' && (
+        <div>
+          {/* Sub-tabs: Sections, Branding, Settings */}
+          <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--gray-200)', marginBottom: 24 }}>
+            {['sections', 'branding', 'settings'].map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab)} style={{
+                padding: '10px 20px', fontSize: 14, fontWeight: 600, border: 'none', cursor: 'pointer',
+                background: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent',
+                color: activeTab === tab ? 'var(--navy)' : 'var(--gray-400)', marginBottom: -2,
+                textTransform: 'capitalize',
+              }}>{tab}</button>
+            ))}
+            <div style={{ flex: 1 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 4, fontSize: 13, color: 'var(--gray-400)' }}>
+              {config.sections.length} sections · {totalItems} items
             </div>
+          </div>
 
-            <div className="card-body">
-              {/* SECTIONS TAB */}
-              {activeTab === 'sections' && (
-                <div>
-                  {config.sections.length === 0 && (
-                    <div className="empty-state" style={{ padding: 24 }}>
-                      <h3>No sections yet</h3>
-                      <p>Add a section to start building your pricing sheet.</p>
+          {/* SECTIONS TAB */}
+          {activeTab === 'sections' && (
+            <div>
+              {config.sections.length === 0 && (
+                <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
+                  <div style={{ fontSize: 40, marginBottom: 12, opacity: 0.3 }}>📋</div>
+                  <h3 style={{ fontSize: 18, color: 'var(--gray-600)', marginBottom: 6 }}>No sections yet</h3>
+                  <p style={{ color: 'var(--gray-400)', marginBottom: 16, fontSize: 14 }}>Add a section manually or import from an Excel/CSV file.</p>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+                    <button className="btn btn-primary" onClick={addSection}>+ Add Section</button>
+                    <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>📄 Import File</button>
+                  </div>
+                </div>
+              )}
+
+              {config.sections.map((section, sIdx) => (
+                <div key={sIdx} className="card" style={{ marginBottom: 16 }}>
+                  {/* Section header */}
+                  <div
+                    onClick={() => toggleSection(sIdx)}
+                    style={{
+                      padding: '14px 20px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      borderBottom: expandedSections[sIdx] ? '1px solid var(--gray-200)' : 'none',
+                      background: 'var(--gray-50)', borderRadius: expandedSections[sIdx] ? '8px 8px 0 0' : 8,
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ color: 'var(--gray-400)', fontSize: 11, transition: 'transform 0.15s', transform: expandedSections[sIdx] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                      <span style={{ fontWeight: 700, fontSize: 15, color: 'var(--navy)' }}>{section.title || 'Untitled Section'}</span>
+                      {section.subtitle && <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>— {section.subtitle}</span>}
+                      <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10, background: 'rgba(201,169,110,0.15)', color: '#8B6914' }}>
+                        {section.items.length} item{section.items.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
-                  )}
+                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button className="btn btn-outline btn-sm" onClick={() => moveSection(sIdx, -1)} disabled={sIdx === 0} title="Move up">↑</button>
+                      <button className="btn btn-outline btn-sm" onClick={() => moveSection(sIdx, 1)} disabled={sIdx === config.sections.length - 1} title="Move down">↓</button>
+                      <button className="btn btn-outline btn-sm" style={{ color: 'var(--red)' }} onClick={() => removeSection(sIdx)} title="Delete section">✕</button>
+                    </div>
+                  </div>
 
-                  {config.sections.map((section, sIdx) => (
-                    <div key={sIdx} className="section-card">
-                      <div className="section-card-header" onClick={() => toggleSection(sIdx)}>
-                        <h4>
-                          <span style={{ fontSize: 10, color: 'var(--gray-400)' }}>☰</span>
-                          {section.title || 'Untitled Section'}
-                          <span className="badge badge-gold" style={{ fontSize: 10 }}>{section.items.length}</span>
-                        </h4>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); moveSection(sIdx, -1); }} disabled={sIdx === 0}>↑</button>
-                          <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); moveSection(sIdx, 1); }} disabled={sIdx === config.sections.length - 1}>↓</button>
-                          <button className="btn btn-outline btn-sm" style={{ color: 'var(--red)' }} onClick={(e) => { e.stopPropagation(); removeSection(sIdx); }}>×</button>
+                  {/* Section body */}
+                  {expandedSections[sIdx] && (
+                    <div style={{ padding: 20 }}>
+                      {/* Section title/subtitle */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Section Title</label>
+                          <input className="form-input" value={section.title} onChange={e => updateSection(sIdx, 'title', e.target.value)} />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Subtitle (optional)</label>
+                          <input className="form-input" value={section.subtitle || ''} onChange={e => updateSection(sIdx, 'subtitle', e.target.value)} placeholder="e.g., Most Popular" />
                         </div>
                       </div>
 
-                      {expandedSections[sIdx] && (
-                        <div className="section-card-body">
-                          <div className="grid-2" style={{ marginBottom: 12 }}>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label>Section Title</label>
-                              <input className="form-input form-input-sm" value={section.title} onChange={e => updateSection(sIdx, 'title', e.target.value)} />
-                            </div>
-                            <div className="form-group" style={{ marginBottom: 0 }}>
-                              <label>Subtitle (optional)</label>
-                              <input className="form-input form-input-sm" value={section.subtitle || ''} onChange={e => updateSection(sIdx, 'subtitle', e.target.value)} placeholder="e.g., Most Popular" />
-                            </div>
-                          </div>
+                      {/* Products table */}
+                      <div style={{ border: '1px solid var(--gray-200)', borderRadius: 8, overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                          <thead>
+                            <tr style={{ background: 'var(--gray-50)' }}>
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: 0.5, width: 130 }}>SKU</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: 0.5 }}>Product Name</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: 0.5, width: 110 }}>Price</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: 'var(--green)', textTransform: 'uppercase', letterSpacing: 0.5, width: 110 }}>Commission</th>
+                              <th style={{ padding: '10px 14px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: 0.5, width: 110 }}>Net Owed</th>
+                              <th style={{ width: 44 }}></th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {section.items.map((item, iIdx) => (
+                              <tr key={iIdx} style={{ borderTop: '1px solid var(--gray-100)' }}>
+                                <td style={{ padding: '6px 14px' }}>
+                                  <input className="form-input form-input-sm" value={item.sku} onChange={e => updateItem(sIdx, iIdx, 'sku', e.target.value)} placeholder="SKU" style={{ fontFamily: 'monospace', fontSize: 12 }} />
+                                </td>
+                                <td style={{ padding: '6px 14px' }}>
+                                  <input className="form-input form-input-sm" value={item.name} onChange={e => updateItem(sIdx, iIdx, 'name', e.target.value)} placeholder="Product name" />
+                                </td>
+                                <td style={{ padding: '6px 14px' }}>
+                                  <input type="number" className="form-input form-input-sm" value={item.price} onChange={e => updateItem(sIdx, iIdx, 'price', e.target.value)} style={{ textAlign: 'right' }} />
+                                </td>
+                                <td style={{ padding: '6px 14px' }}>
+                                  <input type="number" className="form-input form-input-sm" value={item.commission} onChange={e => updateItem(sIdx, iIdx, 'commission', e.target.value)} style={{ textAlign: 'right', color: 'var(--green)' }} />
+                                </td>
+                                <td style={{ padding: '6px 14px', textAlign: 'right', fontWeight: 700, fontSize: 13, color: 'var(--navy)', fontFamily: 'monospace' }}>
+                                  {fmt(item.price - item.commission)}
+                                </td>
+                                <td style={{ padding: '6px 8px', textAlign: 'center' }}>
+                                  <button
+                                    onClick={() => removeItem(sIdx, iIdx)}
+                                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--gray-400)', fontSize: 16, lineHeight: 1, padding: 4 }}
+                                    title="Remove item"
+                                    onMouseOver={e => e.target.style.color = 'var(--red)'}
+                                    onMouseOut={e => e.target.style.color = 'var(--gray-400)'}
+                                  >✕</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
 
-                          {/* Product rows header */}
-                          <div className="product-row product-row-header">
-                            <span>SKU</span><span>Name</span><span>Price</span><span>Comm.</span><span>Net</span><span></span>
-                          </div>
-
-                          {section.items.map((item, iIdx) => (
-                            <div key={iIdx} className="product-row">
-                              <input className="form-input form-input-sm" value={item.sku} onChange={e => updateItem(sIdx, iIdx, 'sku', e.target.value)} placeholder="SKU" />
-                              <input className="form-input form-input-sm" value={item.name} onChange={e => updateItem(sIdx, iIdx, 'name', e.target.value)} placeholder="Product name" />
-                              <input type="number" className="form-input form-input-sm" value={item.price} onChange={e => updateItem(sIdx, iIdx, 'price', e.target.value)} />
-                              <input type="number" className="form-input form-input-sm" value={item.commission} onChange={e => updateItem(sIdx, iIdx, 'commission', e.target.value)} />
-                              <span className="text-sm" style={{ textAlign: 'right', fontWeight: 600 }}>{fmt(item.price - item.commission)}</span>
-                              <button className="btn btn-outline btn-sm" style={{ color: 'var(--red)', padding: '2px 6px' }} onClick={() => removeItem(sIdx, iIdx)}>×</button>
-                            </div>
-                          ))}
-
-                          <div style={{ marginTop: 8, display: 'flex', gap: 6 }}>
-                            <button className="btn btn-outline btn-sm" onClick={() => addItem(sIdx)}>+ Add Row</button>
-                            <button className="btn btn-outline btn-sm" onClick={() => { setShowCatalogPicker(sIdx); setCatalogSearch(''); }}>
-                              + From Catalog
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                      {/* Add buttons */}
+                      <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+                        <button className="btn btn-outline btn-sm" onClick={() => addItem(sIdx)}>+ Add Row</button>
+                        <button className="btn btn-outline btn-sm" onClick={() => { setShowCatalogPicker(sIdx); setCatalogSearch(''); }}>+ From Catalog</button>
+                      </div>
                     </div>
-                  ))}
-
-                  <button className="btn btn-primary" style={{ width: '100%' }} onClick={addSection}>
-                    + Add Section
-                  </button>
+                  )}
                 </div>
-              )}
+              ))}
 
-              {/* BRANDING TAB */}
-              {activeTab === 'branding' && (
-                <div>
-                  <div className="form-group">
-                    <label>Company Name</label>
-                    <input className="form-input" value={config.companyName} onChange={e => updateConfig('companyName', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label>Document Title</label>
-                    <input className="form-input" value={config.title} onChange={e => updateConfig('title', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label>Subtitle</label>
-                    <input className="form-input" value={config.subtitle} onChange={e => updateConfig('subtitle', e.target.value)} />
-                  </div>
-                  <div className="form-group">
-                    <label>Badge Text</label>
-                    <input className="form-input" value={config.badge} onChange={e => updateConfig('badge', e.target.value)} />
-                  </div>
-
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--gray-700)', marginBottom: 8, marginTop: 16 }}>Colors</label>
-                  <div className="color-row">
-                    <label>Primary</label>
-                    <input type="color" value={config.primaryColor} onChange={e => updateConfig('primaryColor', e.target.value)} />
-                  </div>
-                  <div className="color-row">
-                    <label>Accent</label>
-                    <input type="color" value={config.accentColor} onChange={e => updateConfig('accentColor', e.target.value)} />
-                  </div>
-                  <div className="color-row">
-                    <label>Section Headers</label>
-                    <input type="color" value={config.headerBg} onChange={e => updateConfig('headerBg', e.target.value)} />
-                  </div>
-                  <div className="color-row">
-                    <label>Commission</label>
-                    <input type="color" value={config.commissionColor} onChange={e => updateConfig('commissionColor', e.target.value)} />
-                  </div>
-
-                  <div className="form-group" style={{ marginTop: 16 }}>
-                    <label>Governance Statement</label>
-                    <textarea className="form-textarea" value={config.governanceStatement} onChange={e => updateConfig('governanceStatement', e.target.value)} rows={3} />
-                  </div>
-                  <div className="form-group">
-                    <label>Footer Text</label>
-                    <input className="form-input" value={config.footerText} onChange={e => updateConfig('footerText', e.target.value)} />
-                  </div>
-                </div>
-              )}
-
-              {/* SETTINGS TAB */}
-              {activeTab === 'settings' && (
-                <div>
-                  <div className="form-group">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" checked={config.showFormula} onChange={e => updateConfig('showFormula', e.target.checked)} />
-                      Show "How Partner Billing Works" box
-                    </label>
-                  </div>
-                  <div className="form-group">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <input type="checkbox" checked={config.showGovernance} onChange={e => updateConfig('showGovernance', e.target.checked)} />
-                      Show governance statement
-                    </label>
-                  </div>
-                </div>
+              {config.sections.length > 0 && (
+                <button className="btn btn-primary" onClick={addSection} style={{ marginTop: 4 }}>+ Add Section</button>
               )}
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* Preview pane */}
-        <div className="builder-preview">
-          <div style={{ padding: 24 }}>
+          {/* BRANDING TAB */}
+          {activeTab === 'branding' && (
+            <div className="card" style={{ maxWidth: 640 }}>
+              <div style={{ padding: 24 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Company Name</label>
+                    <input className="form-input" value={config.companyName} onChange={e => updateConfig('companyName', e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Badge Text</label>
+                    <input className="form-input" value={config.badge} onChange={e => updateConfig('badge', e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Document Title</label>
+                    <input className="form-input" value={config.title} onChange={e => updateConfig('title', e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Subtitle</label>
+                    <input className="form-input" value={config.subtitle} onChange={e => updateConfig('subtitle', e.target.value)} />
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 20 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>Colors</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
+                    {[
+                      { key: 'primaryColor', label: 'Primary' },
+                      { key: 'accentColor', label: 'Accent' },
+                      { key: 'headerBg', label: 'Headers' },
+                      { key: 'commissionColor', label: 'Commission' },
+                    ].map(({ key, label }) => (
+                      <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--gray-50)', borderRadius: 6 }}>
+                        <input type="color" value={config[key]} onChange={e => updateConfig(key, e.target.value)} style={{ width: 32, height: 24, border: '1px solid var(--gray-300)', borderRadius: 4, cursor: 'pointer', padding: 1 }} />
+                        <span style={{ fontSize: 13, color: 'var(--gray-600)' }}>{label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Governance Statement</label>
+                  <textarea className="form-textarea" value={config.governanceStatement} onChange={e => updateConfig('governanceStatement', e.target.value)} rows={3} />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>Footer Text</label>
+                  <input className="form-input" value={config.footerText} onChange={e => updateConfig('footerText', e.target.value)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SETTINGS TAB */}
+          {activeTab === 'settings' && (
+            <div className="card" style={{ maxWidth: 480 }}>
+              <div style={{ padding: 24 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', borderBottom: '1px solid var(--gray-100)', cursor: 'pointer', fontSize: 14 }}>
+                  <input type="checkbox" checked={config.showFormula} onChange={e => updateConfig('showFormula', e.target.checked)} style={{ width: 18, height: 18 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--navy)' }}>Show "How Partner Billing Works" box</div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-400)' }}>Displays the commission formula at the top of the sheet</div>
+                  </div>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 0', cursor: 'pointer', fontSize: 14 }}>
+                  <input type="checkbox" checked={config.showGovernance} onChange={e => updateConfig('showGovernance', e.target.checked)} style={{ width: 18, height: 18 }} />
+                  <div>
+                    <div style={{ fontWeight: 600, color: 'var(--navy)' }}>Show governance statement</div>
+                    <div style={{ fontSize: 12, color: 'var(--gray-400)' }}>Legal/terms disclaimer at the bottom of the sheet</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* PREVIEW MODE */}
+      {viewMode === 'preview' && (
+        <div style={{ maxWidth: 820, margin: '0 auto' }}>
+          <div className="card" style={{ padding: 32 }}>
             <PreviewPane config={config} />
           </div>
         </div>
-      </div>
+      )}
 
       {/* Catalog picker modal */}
       {showCatalogPicker !== null && (
@@ -607,62 +695,27 @@ export default function Builder() {
               <button className="btn btn-outline btn-sm" onClick={() => setShowCatalogPicker(null)}>×</button>
             </div>
             <div className="modal-body">
-              <input
-                className="form-input"
-                placeholder="Search products..."
-                value={catalogSearch}
-                onChange={e => setCatalogSearch(e.target.value)}
-                style={{ marginBottom: 12 }}
-                autoFocus
-              />
-
-              {/* Quick add by category */}
+              <input className="form-input" placeholder="Search products..." value={catalogSearch} onChange={e => setCatalogSearch(e.target.value)} style={{ marginBottom: 12 }} autoFocus />
               <div style={{ marginBottom: 12, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
                 {[...new Set(catalogProducts.map(p => p.category))].filter(Boolean).map(cat => (
-                  <button key={cat} className="btn btn-outline btn-sm" onClick={() => addAllCategoryProducts(showCatalogPicker, cat)}>
-                    + All {cat}
-                  </button>
+                  <button key={cat} className="btn btn-outline btn-sm" onClick={() => addAllCategoryProducts(showCatalogPicker, cat)}>+ All {cat}</button>
                 ))}
               </div>
-
               <div style={{ maxHeight: 400, overflow: 'auto' }}>
                 <table>
-                  <thead>
-                    <tr>
-                      <th>SKU</th>
-                      <th>Product</th>
-                      <th style={{ textAlign: 'right' }}>Price</th>
-                      <th style={{ width: 60 }}></th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>SKU</th><th>Product</th><th style={{ textAlign: 'right' }}>Price</th><th style={{ width: 60 }}></th></tr></thead>
                   <tbody>
-                    {catalogProducts
-                      .filter(p => {
-                        if (!catalogSearch) return true;
-                        const q = catalogSearch.toLowerCase();
-                        return p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q);
-                      })
-                      .slice(0, 100)
-                      .map(p => (
-                        <tr key={p.id}>
-                          <td><code style={{ fontSize: 11 }}>{p.sku}</code></td>
-                          <td>
-                            {p.name}
-                            <div style={{ fontSize: 11, color: 'var(--gray-400)' }}>{p.category}</div>
-                          </td>
-                          <td style={{ textAlign: 'right' }}>${(+p.price).toFixed(2)}</td>
-                          <td>
-                            <button className="btn btn-primary btn-sm" onClick={() => addFromCatalog(showCatalogPicker, p)}>Add</button>
-                          </td>
-                        </tr>
-                      ))}
+                    {catalogProducts.filter(p => { if (!catalogSearch) return true; const q = catalogSearch.toLowerCase(); return p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q) || p.category?.toLowerCase().includes(q); }).slice(0, 100).map(p => (
+                      <tr key={p.id}>
+                        <td><code style={{ fontSize: 11 }}>{p.sku}</code></td>
+                        <td>{p.name}<div style={{ fontSize: 11, color: 'var(--gray-400)' }}>{p.category}</div></td>
+                        <td style={{ textAlign: 'right' }}>${(+p.price).toFixed(2)}</td>
+                        <td><button className="btn btn-primary btn-sm" onClick={() => addFromCatalog(showCatalogPicker, p)}>Add</button></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
-                {catalogProducts.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: 24, color: 'var(--gray-400)' }}>
-                    No products in catalog. Import a CSV first.
-                  </div>
-                )}
+                {catalogProducts.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--gray-400)' }}>No products in catalog. Import a CSV first.</div>}
               </div>
             </div>
           </div>
@@ -678,31 +731,18 @@ export default function Builder() {
               <button className="btn btn-outline btn-sm" onClick={() => setShowImportModal(false)}>×</button>
             </div>
             <div className="modal-body">
-              <p style={{ marginBottom: 16, fontSize: 14, color: 'var(--gray-600)' }}>
-                Upload an Excel or CSV file to auto-generate sections and products.
-              </p>
-
+              <p style={{ marginBottom: 16, fontSize: 14, color: 'var(--gray-600)' }}>Upload an Excel or CSV file to auto-generate sections and products.</p>
               <div className="upload-area" onClick={() => importFileRef.current?.click()}>
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <p style={{ marginTop: 8, color: 'var(--gray-500)', fontWeight: 600 }}>Click to select file</p>
                 <p style={{ fontSize: 12, color: 'var(--gray-400)' }}>.xlsx, .xls, or .csv</p>
                 <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileImport} />
               </div>
-
-              <div style={{ marginTop: 16, padding: 16, background: 'var(--gray-50)', borderRadius: 'var(--radius)', fontSize: 13, color: 'var(--gray-600)' }}>
+              <div style={{ marginTop: 16, padding: 16, background: 'var(--gray-50)', borderRadius: 8, fontSize: 13, color: 'var(--gray-600)' }}>
                 <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--navy)' }}>Supported formats:</div>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>Multi-tab Excel</strong> — Each tab becomes a section (like the KY Rugged pricing sheet)
-                </div>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>Single-sheet with categories</strong> — Auto-groups by Category/Section column
-                </div>
-                <div style={{ marginBottom: 6 }}>
-                  <strong>Simple CSV</strong> — Creates one section from all rows
-                </div>
-                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--gray-400)' }}>
-                  Auto-detects columns: SKU, Name/Description, Price, Commission
-                </div>
+                <div style={{ marginBottom: 4 }}><strong>Multi-tab Excel</strong> — Each tab becomes a section</div>
+                <div style={{ marginBottom: 4 }}><strong>Single-sheet with categories</strong> — Auto-groups by Category column</div>
+                <div><strong>Simple CSV</strong> — Creates one section from all rows</div>
               </div>
             </div>
           </div>
