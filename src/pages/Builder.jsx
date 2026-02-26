@@ -209,8 +209,6 @@ export default function Builder() {
     const w = window.open('', '_blank');
     w.document.write(html);
     w.document.close();
-    w.onload = () => w.print();
-    setTimeout(() => { try { w.print(); } catch(e) {} }, 800);
   }
 
   function handleFileImport(e) {
@@ -347,36 +345,37 @@ export default function Builder() {
   function generatePrintHTML() {
     const c = config;
     const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const totalItems = c.sections.reduce((sum, s) => sum + s.items.filter(i => i.name).length, 0);
 
-    const sectionsHTML = c.sections.map(s => {
+    const sectionsHTML = c.sections.map((s) => {
       const validItems = s.items.filter(i => i.name);
       if (validItems.length === 0) return '';
 
       const rows = validItems.map((item, idx) => `
-        <tr style="background:${idx % 2 === 0 ? '#FFFFFF' : '#FAFBFC'}">
-          <td style="padding:5pt 10pt;font-size:9pt;font-family:'Courier New',monospace;color:#334155;border-bottom:1px solid #EEF1F5">${item.sku}</td>
-          <td style="padding:5pt 10pt;font-size:9pt;color:#1E293B;border-bottom:1px solid #EEF1F5">${item.name}</td>
-          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:600;color:#1E293B;border-bottom:1px solid #EEF1F5">$${(+item.price).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:600;color:${c.commissionColor};border-bottom:1px solid #EEF1F5">${(+item.commission) > 0 ? '$' + (+item.commission).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'}</td>
-          <td style="padding:5pt 10pt;text-align:right;font-size:9pt;font-weight:700;color:#0F1A2E;border-bottom:1px solid #EEF1F5">$${(+item.price - +item.commission).toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        <tr>
+          <td style="padding:7pt 12pt;font-size:8.5pt;font-family:'Courier New',monospace;color:#475569;border-bottom:1px solid #F1F5F9;background:${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}">${item.sku}</td>
+          <td style="padding:7pt 12pt;font-size:8.5pt;color:#1E293B;border-bottom:1px solid #F1F5F9;background:${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}">${item.name}</td>
+          <td style="padding:7pt 12pt;text-align:right;font-size:8.5pt;font-weight:600;color:#1E293B;border-bottom:1px solid #F1F5F9;background:${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}">$${(+item.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          <td style="padding:7pt 12pt;text-align:right;font-size:8.5pt;font-weight:700;color:${c.commissionColor};border-bottom:1px solid #F1F5F9;background:${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}">${(+item.commission) > 0 ? '$'+(+item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'}</td>
+          <td style="padding:7pt 12pt;text-align:right;font-size:8.5pt;font-weight:700;color:${c.primaryColor};border-bottom:1px solid #F1F5F9;background:${idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC'}">$${(+item.price - +item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
         </tr>
       `).join('');
 
       return `
-        <div class="section-block">
-          <table style="width:100%;border-collapse:collapse;margin-bottom:14pt">
+        <div class="section-block" style="margin-bottom:18pt">
+          <div style="background:${c.headerBg};padding:8pt 14pt;display:flex;align-items:center">
+            <div style="width:4pt;height:16pt;background:${c.accentColor};border-radius:2pt;margin-right:10pt;flex-shrink:0"></div>
+            <div style="color:#FFFFFF;font-size:10.5pt;font-weight:700;letter-spacing:0.3pt;flex:1">${s.title}</div>
+            ${s.subtitle ? '<div style="color:rgba(255,255,255,0.6);font-size:8pt;font-weight:400">' + s.subtitle + '</div>' : ''}
+          </div>
+          <table style="width:100%;border-collapse:collapse">
             <thead>
               <tr>
-                <th colspan="5" style="background:${c.headerBg};color:#FFFFFF;padding:6pt 10pt;font-size:10pt;font-weight:700;text-align:left;letter-spacing:0.3pt">
-                  ${s.title}${s.subtitle ? '<span style="font-weight:400;font-size:8pt;opacity:0.8;margin-left:8pt">\u2014 ' + s.subtitle + '</span>' : ''}
-                </th>
-              </tr>
-              <tr style="background:#F1F5F9">
-                <th style="padding:4pt 10pt;text-align:left;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:16%">SKU</th>
-                <th style="padding:4pt 10pt;text-align:left;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1">Description</th>
-                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Customer Price</th>
-                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:${c.commissionColor};text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Your Commission</th>
-                <th style="padding:4pt 10pt;text-align:right;font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:0.5pt;border-bottom:2px solid #CBD5E1;width:14%">Net Owed</th>
+                <th style="padding:6pt 12pt;text-align:left;font-size:6.5pt;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:1pt;border-bottom:2pt solid ${c.accentColor};background:#F8FAFC;width:15%">SKU</th>
+                <th style="padding:6pt 12pt;text-align:left;font-size:6.5pt;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:1pt;border-bottom:2pt solid ${c.accentColor};background:#F8FAFC">Description</th>
+                <th style="padding:6pt 12pt;text-align:right;font-size:6.5pt;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:1pt;border-bottom:2pt solid ${c.accentColor};background:#F8FAFC;width:13%">Price</th>
+                <th style="padding:6pt 12pt;text-align:right;font-size:6.5pt;font-weight:800;color:${c.commissionColor};text-transform:uppercase;letter-spacing:1pt;border-bottom:2pt solid ${c.accentColor};background:#F8FAFC;width:13%">Commission</th>
+                <th style="padding:6pt 12pt;text-align:right;font-size:6.5pt;font-weight:800;color:#94A3B8;text-transform:uppercase;letter-spacing:1pt;border-bottom:2pt solid ${c.accentColor};background:#F8FAFC;width:13%">Net Owed</th>
               </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -386,14 +385,12 @@ export default function Builder() {
     }).join('');
 
     const formulaBox = c.showFormula ? `
-      <table style="width:100%;margin-bottom:14pt"><tr><td style="padding:0">
-        <div style="border:1.5pt solid ${c.accentColor};padding:8pt 14pt;text-align:center;background:#FAFBFC">
-          <div style="font-size:7pt;font-weight:700;color:#64748B;text-transform:uppercase;letter-spacing:1pt;margin-bottom:3pt">How Partner Billing Works</div>
-          <div style="font-size:11pt;font-weight:700;color:${c.primaryColor}">
-            Customer Invoice Price &nbsp;\u2212&nbsp; <span style="color:${c.commissionColor}">Your Commission</span> &nbsp;=&nbsp; Net Owed to Company
-          </div>
+      <div style="margin:18pt 0;padding:12pt 18pt;background:linear-gradient(135deg,${c.primaryColor} 0%,${c.headerBg} 100%);border-radius:6pt;text-align:center">
+        <div style="font-size:6.5pt;font-weight:700;color:${c.accentColor};text-transform:uppercase;letter-spacing:2pt;margin-bottom:5pt">How Partner Billing Works</div>
+        <div style="font-size:12pt;font-weight:700;color:#FFFFFF">
+          Customer Invoice &nbsp;\u2212&nbsp; <span style="color:${c.accentColor}">Your Commission</span> &nbsp;=&nbsp; Net Owed to Company
         </div>
-      </td></tr></table>
+      </div>
     ` : '';
 
     return `<!DOCTYPE html>
@@ -401,63 +398,86 @@ export default function Builder() {
 <head>
   <meta charset="utf-8">
   <title>${sheetName}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    @page {
-      size: letter;
-      margin: 0.6in 0.65in 0.75in 0.65in;
-    }
+    @page { size: letter; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
-      font-family: Calibri, 'Segoe UI', Arial, Helvetica, sans-serif;
-      font-size: 10pt;
-      color: #1E293B;
-      line-height: 1.4;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 10pt; color: #1E293B; line-height: 1.4;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
     }
     @media screen {
-      body { background: #E2E8F0; padding: 20px; }
-      .page-wrap {
-        max-width: 8.5in; margin: 0 auto; background: white;
-        padding: 0.6in 0.65in 0.75in 0.65in;
-        box-shadow: 0 2px 20px rgba(0,0,0,0.15);
-        min-height: 11in;
+      body { background: #1E293B; padding: 0; }
+      .toolbar {
+        background: ${c.primaryColor}; color: white; padding: 14px 24px;
+        display: flex; align-items: center; justify-content: center; gap: 16px;
+        position: sticky; top: 0; z-index: 100;
+        font-family: 'Inter', sans-serif; border-bottom: 3px solid ${c.accentColor};
       }
+      .toolbar .tip { font-size: 12px; color: ${c.accentColor}; font-weight: 500; }
+      .toolbar .tip strong { color: white; }
+      .toolbar .print-btn {
+        background: ${c.accentColor}; color: ${c.primaryColor}; border: none;
+        padding: 10px 28px; font-size: 14px; font-weight: 700; border-radius: 4px;
+        cursor: pointer; font-family: 'Inter', sans-serif;
+      }
+      .toolbar .close-btn {
+        background: transparent; color: #94A3B8; border: 1px solid #475569;
+        padding: 10px 18px; font-size: 13px; font-weight: 600; border-radius: 4px;
+        cursor: pointer; font-family: 'Inter', sans-serif;
+      }
+      .doc {
+        width: 8.5in; min-height: 11in; margin: 24px auto; background: white;
+        box-shadow: 0 4px 40px rgba(0,0,0,0.4); overflow: hidden;
+      }
+      .doc-body { padding: 0 0.55in 0.6in 0.55in; }
     }
     @media print {
-      body { background: white; padding: 0; }
-      .page-wrap { padding: 0; box-shadow: none; min-height: auto; }
-      .no-print { display: none !important; }
+      .toolbar { display: none !important; }
+      .doc { width: auto; min-height: auto; margin: 0; box-shadow: none; }
+      .doc-body { padding: 0 0.55in 0.5in 0.55in; }
     }
-    table { page-break-inside: auto; }
-    tr { page-break-inside: avoid; page-break-after: auto; }
+    table { page-break-inside: auto; border-collapse: collapse; }
+    tr { page-break-inside: avoid; }
     thead { display: table-header-group; }
     .section-block { page-break-inside: avoid; }
   </style>
 </head>
 <body>
-  <div class="no-print" style="text-align:center;padding:12px;background:#0F1A2E;position:sticky;top:0;z-index:10">
-    <button onclick="window.print()" style="background:#C9A96E;color:#0F1A2E;border:none;padding:10px 32px;font-size:13px;font-weight:700;border-radius:4px;cursor:pointer;margin-right:8px">
-      Print / Save as PDF
-    </button>
-    <button onclick="window.close()" style="background:transparent;color:#94A3B8;border:1px solid #475569;padding:10px 20px;font-size:13px;font-weight:600;border-radius:4px;cursor:pointer">
-      Close
-    </button>
+  <div class="toolbar">
+    <button class="print-btn" onclick="window.print()">\u25B6\u2002Print / Save as PDF</button>
+    <div class="tip"><strong>Tip:</strong> Set Margins to <strong>None</strong> and uncheck <strong>\u201CHeaders and footers\u201D</strong> for best results.</div>
+    <button class="close-btn" onclick="window.close()">Close</button>
   </div>
-  <div class="page-wrap">
-    <table style="width:100%;margin-bottom:10pt"><tr><td style="padding:0">
-      <div style="background:${c.primaryColor};color:white;padding:16pt 20pt;text-align:center">
-        <div style="font-size:7pt;font-weight:700;letter-spacing:2.5pt;color:${c.accentColor};text-transform:uppercase;margin-bottom:3pt">${c.badge}</div>
-        <div style="font-size:16pt;font-weight:800;letter-spacing:0.5pt">${c.companyName}</div>
-        <div style="font-size:11pt;color:${c.accentColor};margin-top:4pt;font-weight:700">${c.title}</div>
-        <div style="font-size:8pt;color:#94A3B8;margin-top:2pt">${c.subtitle}</div>
+
+  <div class="doc">
+    <div style="background:${c.primaryColor};padding:28pt 0.55in 22pt;position:relative;overflow:hidden">
+      <div style="position:absolute;top:0;right:0;width:180pt;height:100%;background:linear-gradient(135deg,transparent 40%,rgba(201,169,110,0.08) 100%)"></div>
+      <div style="position:absolute;top:0;left:0;right:0;height:3pt;background:${c.accentColor}"></div>
+      <div style="position:relative;text-align:center">
+        <div style="font-size:7pt;font-weight:700;letter-spacing:3pt;color:${c.accentColor};text-transform:uppercase;margin-bottom:6pt">\u2605\u2002${c.badge}\u2002\u2605</div>
+        <div style="font-size:18pt;font-weight:900;letter-spacing:0.5pt;color:#FFFFFF">${c.companyName}</div>
+        <div style="width:50pt;height:2pt;background:${c.accentColor};margin:8pt auto"></div>
+        <div style="font-size:10.5pt;color:${c.accentColor};font-weight:700;letter-spacing:0.8pt">${c.title}</div>
+        <div style="font-size:8pt;color:#94A3B8;margin-top:3pt">${c.subtitle}</div>
       </div>
-    </td></tr></table>
-    <div style="text-align:right;font-size:7.5pt;color:#94A3B8;margin-bottom:10pt">Prepared ${today}</div>
-    ${formulaBox}
-    ${sectionsHTML}
-    ${c.showGovernance ? `<div style="margin-top:14pt;padding:8pt 12pt;background:#F8FAFC;border-left:3pt solid ${c.accentColor};font-size:7.5pt;color:#94A3B8;line-height:1.5">${c.governanceStatement}</div>` : ''}
-    <div style="margin-top:10pt;padding-top:8pt;border-top:1pt solid #E2E8F0;text-align:center;font-size:7.5pt;color:#CBD5E1">${c.footerText}</div>
+    </div>
+    <div style="background:#F8FAFC;padding:5pt 0.55in;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #E2E8F0">
+      <div style="font-size:7pt;color:#94A3B8;font-weight:600;text-transform:uppercase;letter-spacing:0.5pt">Confidential \u2022 For Authorized Partners Only</div>
+      <div style="font-size:7pt;color:#94A3B8">${today}</div>
+    </div>
+    <div class="doc-body" style="padding-top:16pt">
+      ${formulaBox}
+      ${sectionsHTML}
+      ${c.showGovernance ? '<div style="margin-top:18pt;padding:10pt 14pt;background:#F8FAFC;border-left:3pt solid ' + c.accentColor + ';font-size:7pt;color:#94A3B8;line-height:1.6">' + c.governanceStatement + '</div>' : ''}
+      <div style="margin-top:16pt;padding-top:10pt;border-top:1pt solid #E2E8F0;display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:7pt;color:#CBD5E1">${c.footerText}</div>
+        <div style="font-size:7pt;color:#CBD5E1">${c.sections.length} categories \u2022 ${totalItems} items</div>
+      </div>
+    </div>
+    <div style="height:4pt;background:linear-gradient(90deg,${c.primaryColor} 0%,${c.accentColor} 50%,${c.primaryColor} 100%)"></div>
   </div>
 </body>
 </html>`;
