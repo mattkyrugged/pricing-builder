@@ -31,28 +31,78 @@ export default function Builder() {
   const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
   const [activeTab, setActiveTab] = useState('sections');
   const [expandedSections, setExpandedSections] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
   const [loaded, setLoaded] = useState(!id);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [showCatalogPicker, setShowCatalogPicker] = useState(null);
   const [catalogSearch, setCatalogSearch] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const importFileRef = useRef();
+  const sheetIdRef = useRef(id || null);
+  const saveTimerRef = useRef(null);
+  const skipAutoSaveRef = useRef(true); // skip the first render
 
   // Load existing sheet
   useEffect(() => {
     if (id) {
+      sheetIdRef.current = id;
       loadSheet(id);
     }
     loadCatalog();
   }, [id]);
 
+  // Auto-save on changes (debounced 1.5s)
+  useEffect(() => {
+    // Skip auto-save on initial load
+    if (skipAutoSaveRef.current) {
+      skipAutoSaveRef.current = false;
+      return;
+    }
+    if (!loaded) return;
+
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    setSaveStatus('idle');
+
+    saveTimerRef.current = setTimeout(() => {
+      autoSave();
+    }, 1500);
+
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, [sheetName, config]);
+
+  async function autoSave() {
+    setSaveStatus('saving');
+    try {
+      if (sheetIdRef.current) {
+        // Update existing sheet
+        const { error } = await supabase.from('sheets').update({
+          name: sheetName, config, updated_at: new Date().toISOString()
+        }).eq('id', sheetIdRef.current);
+        if (error) throw error;
+      } else {
+        // Auto-create new sheet
+        const { data, error } = await supabase.from('sheets').insert({
+          name: sheetName, config
+        }).select().single();
+        if (error) throw error;
+        sheetIdRef.current = data.id;
+        navigate(`/builder/${data.id}`, { replace: true });
+      }
+      setSaveStatus('saved');
+    } catch (err) {
+      setSaveStatus('error');
+      console.error('Auto-save failed:', err);
+    }
+  }
+
   async function loadSheet(sheetId) {
     const { data, error } = await supabase.from('sheets').select('*').eq('id', sheetId).single();
     if (error || !data) { toast('Sheet not found', 'error'); navigate('/'); return; }
+    skipAutoSaveRef.current = true; // Don't trigger auto-save from loading
     setSheetName(data.name);
     setConfig({ ...DEFAULT_CONFIG, ...data.config });
     setLoaded(true);
+    setSaveStatus('saved');
   }
 
   async function loadCatalog() {
@@ -128,30 +178,6 @@ export default function Builder() {
     updateConfig('sections', sections);
     toast(`Added ${prods.length} products`);
     setShowCatalogPicker(null);
-  }
-
-  async function saveSheet() {
-    setSaving(true);
-    try {
-      if (id) {
-        const { error } = await supabase.from('sheets').update({
-          name: sheetName, config, updated_at: new Date().toISOString()
-        }).eq('id', id);
-        if (error) throw error;
-        toast('Sheet saved');
-      } else {
-        const { data, error } = await supabase.from('sheets').insert({
-          name: sheetName, config
-        }).select().single();
-        if (error) throw error;
-        toast('Sheet created');
-        navigate(`/builder/${data.id}`, { replace: true });
-      }
-    } catch (err) {
-      toast('Save failed: ' + err.message, 'error');
-    } finally {
-      setSaving(false);
-    }
   }
 
   function exportPDF() {
@@ -373,15 +399,17 @@ export default function Builder() {
             onChange={e => setSheetName(e.target.value)}
             style={{ fontSize: 20, fontWeight: 700, border: 'none', padding: 0, background: 'transparent', color: 'var(--navy)', width: 'auto', minWidth: 200 }}
           />
-          <span className="badge badge-gold">{id ? 'Saved' : 'Draft'}</span>
+          <span className="badge badge-gold" style={{ fontSize: 11 }}>
+            {saveStatus === 'saving' ? '⏳ Saving...' :
+             saveStatus === 'saved' ? '✓ Saved' :
+             saveStatus === 'error' ? '⚠ Save failed' :
+             sheetIdRef.current ? '✓ Saved' : 'Draft'}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-outline" onClick={() => navigate('/')}>← Back</button>
           <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>📄 Import File</button>
           <button className="btn btn-outline" onClick={exportPDF}>🖨 Print / PDF</button>
-          <button className="btn btn-gold" onClick={saveSheet} disabled={saving}>
-            {saving ? 'Saving...' : '💾 Save Sheet'}
-          </button>
         </div>
       </div>
 
