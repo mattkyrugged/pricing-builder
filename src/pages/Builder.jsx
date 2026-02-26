@@ -32,7 +32,7 @@ export default function Builder() {
   const [activeTab, setActiveTab] = useState('sections');
   const [expandedSections, setExpandedSections] = useState({});
   const [saveStatus, setSaveStatus] = useState('idle'); // idle | saving | saved | error
-  const [loaded, setLoaded] = useState(!id);
+  const [loaded, setLoaded] = useState(false);
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [showCatalogPicker, setShowCatalogPicker] = useState(null);
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -40,55 +40,79 @@ export default function Builder() {
   const importFileRef = useRef();
   const sheetIdRef = useRef(id || null);
   const saveTimerRef = useRef(null);
-  const skipAutoSaveRef = useRef(true); // skip the first render
+  const latestDataRef = useRef({ sheetName: 'New Partner Sheet', config: { ...DEFAULT_CONFIG } });
+  const hasPendingChanges = useRef(false);
 
-  // Load existing sheet
+  // Keep latestDataRef in sync so unmount save has current data
+  useEffect(() => {
+    latestDataRef.current = { sheetName, config };
+  }, [sheetName, config]);
+
+  // On mount: load existing sheet OR create a new one immediately
   useEffect(() => {
     if (id) {
       sheetIdRef.current = id;
       loadSheet(id);
+    } else {
+      createNewSheet();
     }
     loadCatalog();
-  }, [id]);
 
-  // Auto-save on changes (debounced 1.5s)
+    // On unmount: flush any pending save
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      if (hasPendingChanges.current && sheetIdRef.current) {
+        const { sheetName: name, config: cfg } = latestDataRef.current;
+        // Fire-and-forget save on unmount
+        supabase.from('sheets').update({
+          name, config: cfg, updated_at: new Date().toISOString()
+        }).eq('id', sheetIdRef.current).then(() => {});
+      }
+    };
+  }, []);
+
+  // Auto-save on changes (debounced 1s)
   useEffect(() => {
-    // Skip auto-save on initial load
-    if (skipAutoSaveRef.current) {
-      skipAutoSaveRef.current = false;
-      return;
-    }
     if (!loaded) return;
 
+    hasPendingChanges.current = true;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     setSaveStatus('idle');
 
     saveTimerRef.current = setTimeout(() => {
-      autoSave();
-    }, 1500);
+      saveToSupabase();
+    }, 1000);
 
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [sheetName, config]);
+  }, [sheetName, config, loaded]);
 
-  async function autoSave() {
+  async function createNewSheet() {
+    try {
+      const { data, error } = await supabase.from('sheets').insert({
+        name: 'New Partner Sheet', config: { ...DEFAULT_CONFIG }
+      }).select().single();
+      if (error) throw error;
+      sheetIdRef.current = data.id;
+      navigate(`/builder/${data.id}`, { replace: true });
+      setLoaded(true);
+      setSaveStatus('saved');
+    } catch (err) {
+      console.error('Failed to create sheet:', err);
+      toast('Failed to create sheet', 'error');
+      setLoaded(true); // still let them edit
+    }
+  }
+
+  async function saveToSupabase() {
+    if (!sheetIdRef.current) return;
     setSaveStatus('saving');
     try {
-      if (sheetIdRef.current) {
-        // Update existing sheet
-        const { error } = await supabase.from('sheets').update({
-          name: sheetName, config, updated_at: new Date().toISOString()
-        }).eq('id', sheetIdRef.current);
-        if (error) throw error;
-      } else {
-        // Auto-create new sheet
-        const { data, error } = await supabase.from('sheets').insert({
-          name: sheetName, config
-        }).select().single();
-        if (error) throw error;
-        sheetIdRef.current = data.id;
-        navigate(`/builder/${data.id}`, { replace: true });
-      }
+      const { error } = await supabase.from('sheets').update({
+        name: sheetName, config, updated_at: new Date().toISOString()
+      }).eq('id', sheetIdRef.current);
+      if (error) throw error;
       setSaveStatus('saved');
+      hasPendingChanges.current = false;
     } catch (err) {
       setSaveStatus('error');
       console.error('Auto-save failed:', err);
@@ -98,7 +122,6 @@ export default function Builder() {
   async function loadSheet(sheetId) {
     const { data, error } = await supabase.from('sheets').select('*').eq('id', sheetId).single();
     if (error || !data) { toast('Sheet not found', 'error'); navigate('/'); return; }
-    skipAutoSaveRef.current = true; // Don't trigger auto-save from loading
     setSheetName(data.name);
     setConfig({ ...DEFAULT_CONFIG, ...data.config });
     setLoaded(true);
