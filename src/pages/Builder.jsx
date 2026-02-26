@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../App';
 
@@ -35,6 +36,8 @@ export default function Builder() {
   const [catalogProducts, setCatalogProducts] = useState([]);
   const [showCatalogPicker, setShowCatalogPicker] = useState(null);
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [showImportModal, setShowImportModal] = useState(false);
+  const importFileRef = useRef();
 
   // Load existing sheet
   useEffect(() => {
@@ -159,6 +162,137 @@ export default function Builder() {
     setTimeout(() => w.print(), 500);
   }
 
+  function handleFileImport(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sections = [];
+
+        // Check if it's a multi-tab Excel (like the KY Rugged sheet)
+        if (workbook.SheetNames.length > 1) {
+          // Multi-tab: each tab becomes a section
+          for (const sheetName of workbook.SheetNames) {
+            const ws = workbook.Sheets[sheetName];
+            const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+            if (rows.length === 0) continue;
+
+            const items = parseRows(rows);
+            if (items.length > 0) {
+              sections.push({ title: sheetName, subtitle: '', items });
+            }
+          }
+        } else {
+          // Single sheet: group by category column if present, otherwise one section
+          const ws = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+
+          // Check if there's a category/section column
+          const headers = Object.keys(rows[0] || {}).map(h => h.toLowerCase());
+          const catKey = Object.keys(rows[0] || {}).find(k =>
+            /category|section|group|type/i.test(k)
+          );
+
+          if (catKey) {
+            // Group rows by category
+            const groups = {};
+            for (const row of rows) {
+              const cat = String(row[catKey] || 'Other').trim();
+              if (!groups[cat]) groups[cat] = [];
+              groups[cat].push(row);
+            }
+            for (const [cat, catRows] of Object.entries(groups)) {
+              const items = parseRows(catRows);
+              if (items.length > 0) {
+                sections.push({ title: cat, subtitle: '', items });
+              }
+            }
+          } else {
+            // No categories, single section
+            const items = parseRows(rows);
+            if (items.length > 0) {
+              sections.push({ title: file.name.replace(/\.[^.]+$/, ''), subtitle: '', items });
+            }
+          }
+        }
+
+        if (sections.length === 0) {
+          toast('No valid data found in file', 'error');
+          return;
+        }
+
+        // Ask whether to replace or append
+        const shouldReplace = config.sections.length === 0 ||
+          confirm(`Replace existing ${config.sections.length} sections? (Cancel to append instead)`);
+
+        if (shouldReplace) {
+          updateConfig('sections', sections);
+        } else {
+          updateConfig('sections', [...config.sections, ...sections]);
+        }
+
+        // Auto-expand all imported sections
+        const expanded = {};
+        const startIdx = shouldReplace ? 0 : config.sections.length;
+        sections.forEach((_, i) => { expanded[startIdx + i] = true; });
+        setExpandedSections(prev => ({ ...prev, ...expanded }));
+
+        toast(`Imported ${sections.length} sections with ${sections.reduce((sum, s) => sum + s.items.length, 0)} items`);
+        setShowImportModal(false);
+        setActiveTab('sections');
+
+      } catch (err) {
+        console.error(err);
+        toast('Failed to parse file: ' + err.message, 'error');
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function parseRows(rows) {
+    const items = [];
+    for (const row of rows) {
+      const keys = Object.keys(row);
+
+      // Find SKU column
+      const skuKey = keys.find(k => /^sku$/i.test(k.trim()))
+        || keys.find(k => /sku|item.?name|item.?number|part.?number|model/i.test(k));
+
+      // Find Name/Description column
+      const nameKey = keys.find(k => /description|item.?desc|product.?name|^name$/i.test(k.trim()))
+        || keys.find(k => /desc|name|product|item/i.test(k) && k !== skuKey);
+
+      // Find Price column
+      const priceKey = keys.find(k => /customer.?price|selling.?price|^price$|^rate$/i.test(k.trim()))
+        || keys.find(k => /price|rate|cost|amount/i.test(k) && !/commission|net/i.test(k));
+
+      // Find Commission column
+      const commKey = keys.find(k => /commission|your.?commission|comm\.?$/i.test(k.trim()))
+        || keys.find(k => /commission|margin|markup/i.test(k));
+
+      const sku = skuKey ? String(row[skuKey]).trim() : '';
+      const name = nameKey ? String(row[nameKey]).trim() : '';
+      const priceRaw = priceKey ? row[priceKey] : 0;
+      const commRaw = commKey ? row[commKey] : 0;
+
+      // Parse dollar amounts (strip $, commas)
+      const price = parseFloat(String(priceRaw).replace(/[$,]/g, '')) || 0;
+      const commission = parseFloat(String(commRaw).replace(/[$,]/g, '')) || 0;
+
+      // Skip empty rows and header-like rows
+      if (!sku && !name) continue;
+      if (/^sku$/i.test(sku) || /^item$/i.test(name)) continue;
+
+      items.push({ sku, name: name || sku, price, commission });
+    }
+    return items;
+  }
+
   function generatePrintHTML() {
     const c = config;
     const sectionsHTML = c.sections.map(s => {
@@ -243,6 +377,7 @@ export default function Builder() {
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-outline" onClick={() => navigate('/')}>← Back</button>
+          <button className="btn btn-outline" onClick={() => setShowImportModal(true)}>📄 Import File</button>
           <button className="btn btn-outline" onClick={exportPDF}>🖨 Print / PDF</button>
           <button className="btn btn-gold" onClick={saveSheet} disabled={saving}>
             {saving ? 'Saving...' : '💾 Save Sheet'}
@@ -482,11 +617,49 @@ export default function Builder() {
           </div>
         </div>
       )}
+
+      {/* Import file modal */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Import Pricing Sheet from File</h3>
+              <button className="btn btn-outline btn-sm" onClick={() => setShowImportModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: 16, fontSize: 14, color: 'var(--gray-600)' }}>
+                Upload an Excel or CSV file to auto-generate sections and products.
+              </p>
+
+              <div className="upload-area" onClick={() => importFileRef.current?.click()}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <p style={{ marginTop: 8, color: 'var(--gray-500)', fontWeight: 600 }}>Click to select file</p>
+                <p style={{ fontSize: 12, color: 'var(--gray-400)' }}>.xlsx, .xls, or .csv</p>
+                <input ref={importFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleFileImport} />
+              </div>
+
+              <div style={{ marginTop: 16, padding: 16, background: 'var(--gray-50)', borderRadius: 'var(--radius)', fontSize: 13, color: 'var(--gray-600)' }}>
+                <div style={{ fontWeight: 700, marginBottom: 8, color: 'var(--navy)' }}>Supported formats:</div>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>Multi-tab Excel</strong> — Each tab becomes a section (like the KY Rugged pricing sheet)
+                </div>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>Single-sheet with categories</strong> — Auto-groups by Category/Section column
+                </div>
+                <div style={{ marginBottom: 6 }}>
+                  <strong>Simple CSV</strong> — Creates one section from all rows
+                </div>
+                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--gray-400)' }}>
+                  Auto-detects columns: SKU, Name/Description, Price, Commission
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
-
-// Preview component
 function PreviewPane({ config }) {
   const c = config;
   return (
