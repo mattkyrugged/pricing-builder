@@ -353,44 +353,22 @@ export default function Builder() {
 
       const rows = validItems.map((item, idx) => `
         <tr style="background:${idx % 2 === 0 ? '#fff' : '#f8f9fb'}">
-          <td class="c-sku">${item.sku}</td>
-          <td class="c-name">${item.name}</td>
-          <td class="c-num">$${(+item.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-          <td class="c-num c-comm">$${(+item.commission) > 0 ? (+item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'}</td>
-          <td class="c-num c-net">$${(+item.price - +item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-        </tr>
-      `).join('');
+          <td class="cs">${item.sku}</td>
+          <td class="cn">${item.name}</td>
+          <td class="cv">$${(+item.price).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+          <td class="cv cc">$${(+item.commission) > 0 ? (+item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}) : '\u2014'}</td>
+          <td class="cv cn2">$${(+item.price - +item.commission).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+        </tr>`).join('');
 
-      return `
-        <table class="sec" cellspacing="0" cellpadding="0">
-          <thead>
-            <tr><th colspan="5" class="sec-title"><table cellspacing="0" cellpadding="0" style="width:100%"><tr>
-              <td style="width:4pt;padding:0"><div style="width:4pt;height:14pt;background:${c.accentColor};border-radius:1pt"></div></td>
-              <td style="padding:0 0 0 8pt;color:#fff;font-size:9.5pt;font-weight:700;letter-spacing:0.3pt">${s.title}${s.subtitle ? ' <span style="font-weight:400;font-size:7.5pt;opacity:0.6">\u2014 ' + s.subtitle + '</span>' : ''}</td>
-            </tr></table></th></tr>
-            <tr class="col-head">
-              <th style="width:14%;text-align:left">SKU</th>
-              <th style="text-align:left">Description</th>
-              <th style="width:12%;text-align:right">Price</th>
-              <th style="width:12%;text-align:right;color:${c.commissionColor}">Commission</th>
-              <th style="width:12%;text-align:right">Net Owed</th>
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      `;
+      return `<div class="sec">
+        <table cellspacing="0" cellpadding="0">
+          <tr><td class="sh" colspan="5"><div class="sh-inner"><div class="sh-pip"></div><span>${s.title}</span></div></td></tr>
+          <tr class="ch"><td style="width:14%;text-align:left">SKU</td><td style="text-align:left">DESCRIPTION</td><td style="width:12%;text-align:right">PRICE</td><td style="width:12%;text-align:right">COMMISSION</td><td style="width:12%;text-align:right">NET OWED</td></tr>
+          ${rows}
+        </table></div>`;
     }).join('');
 
-    const formulaBox = c.showFormula ? `
-      <table cellspacing="0" cellpadding="0" style="width:100%;margin-bottom:12pt"><tr><td style="padding:0">
-        <table cellspacing="0" cellpadding="0" style="width:100%;background:${c.primaryColor}"><tr>
-          <td style="padding:10pt 16pt;text-align:center">
-            <div style="font-size:6pt;font-weight:700;color:${c.accentColor};text-transform:uppercase;letter-spacing:2pt;margin-bottom:3pt">How Partner Billing Works</div>
-            <div style="font-size:11pt;font-weight:700;color:#fff">Customer Invoice Price &nbsp;\u2212&nbsp; <span style="color:${c.accentColor}">Your Commission</span> &nbsp;=&nbsp; Net Owed to Company</div>
-          </td>
-        </tr></table>
-      </td></tr></table>
-    ` : '';
+    const formulaHTML = c.showFormula ? `<div class="formula"><div class="fl">How Partner Billing Works</div><div class="fv">Customer Invoice Price &nbsp;\u2212&nbsp; <span>Your Commission</span> &nbsp;=&nbsp; Net Owed to Company</div></div>` : '';
 
     return `<!DOCTYPE html>
 <html>
@@ -399,120 +377,91 @@ export default function Builder() {
 <title>${sheetName}</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
-@page { size: letter; margin: 0; }
-* { margin:0; padding:0; box-sizing:border-box; }
-html,body {
-  font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
-  font-size:8.5pt; color:#1e293b; line-height:1.35;
-  -webkit-print-color-adjust:exact !important;
-  print-color-adjust:exact !important;
-}
+@page { size:letter; margin:0; }
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;font-size:8pt;color:#1e293b;line-height:1.3;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 
-/* --- Section tables --- */
-table.sec {
-  width:100%; border-collapse:collapse; margin-bottom:10pt;
-  page-break-inside:auto;
-}
-table.sec thead { display:table-header-group; }
-table.sec .sec-title {
-  background:${c.headerBg}; padding:6pt 10pt; text-align:left;
-}
-table.sec .col-head th {
-  padding:4pt 10pt; font-size:6pt; font-weight:800; color:#94a3b8;
-  text-transform:uppercase; letter-spacing:0.8pt;
-  border-bottom:1.5pt solid ${c.accentColor}; background:#f8f9fb;
-}
-table.sec td {
-  padding:5pt 10pt; font-size:8pt; border-bottom:0.5pt solid #eef1f5;
-}
-table.sec .c-sku { font-family:'Courier New',monospace; font-size:7.5pt; color:#475569; }
-table.sec .c-name { color:#1e293b; }
-table.sec .c-num { text-align:right; font-weight:600; color:#1e293b; }
-table.sec .c-comm { color:${c.commissionColor}; font-weight:700; }
-table.sec .c-net { font-weight:800; color:${c.primaryColor}; }
+.hdr{background:${c.primaryColor};padding:20pt 0.5in 16pt;text-align:center;position:relative}
+.hdr .bar{position:absolute;top:0;left:0;right:0;height:2.5pt;background:${c.accentColor}}
+.hdr .badge{font-size:5.5pt;font-weight:700;letter-spacing:2.5pt;color:${c.accentColor};text-transform:uppercase;margin-bottom:4pt}
+.hdr .co{font-size:15pt;font-weight:900;color:#fff;letter-spacing:0.3pt;line-height:1.15}
+.hdr .rule{width:36pt;height:1.5pt;background:${c.accentColor};margin:5pt auto}
+.hdr .ti{font-size:8.5pt;color:${c.accentColor};font-weight:700;letter-spacing:0.5pt;margin-top:2pt}
+.hdr .su{font-size:7pt;color:#94a3b8;margin-top:1pt}
 
-tr { page-break-inside:avoid; break-inside:avoid; }
+.meta{background:#f8f9fb;border-bottom:0.5pt solid #e2e8f0;padding:3pt 0.5in;display:flex;justify-content:space-between;font-size:6pt;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.4pt}
 
-/* --- Screen preview --- */
-@media screen {
-  body { background:#1a1f2e; }
-  .toolbar {
-    background:${c.primaryColor}; padding:12px 20px;
-    text-align:center; position:sticky; top:0; z-index:100;
-    border-bottom:3px solid ${c.accentColor};
-    font-family:'Inter',sans-serif;
-  }
-  .toolbar button {
-    font-family:'Inter',sans-serif; border-radius:4px; cursor:pointer;
-    font-size:13px; font-weight:700; padding:9px 24px; margin:0 4px;
-  }
-  .toolbar .pb { background:${c.accentColor}; color:${c.primaryColor}; border:none; }
-  .toolbar .cb { background:transparent; color:#94a3b8; border:1px solid #475569; }
-  .toolbar .tip { display:inline; font-size:11px; color:${c.accentColor}; margin:0 12px; }
-  .toolbar .tip b { color:#fff; }
-  .doc {
-    width:8.5in; margin:20px auto; background:#fff;
-    box-shadow:0 4px 40px rgba(0,0,0,0.5); overflow:hidden;
-  }
-  .doc-body { padding:0 0.5in 0.5in 0.5in; }
+.body{padding:10pt 0.5in 0.35in}
+
+.formula{background:${c.primaryColor};padding:8pt 14pt;text-align:center;margin-bottom:10pt}
+.fl{font-size:5.5pt;font-weight:700;color:${c.accentColor};text-transform:uppercase;letter-spacing:1.5pt;margin-bottom:2pt}
+.fv{font-size:9.5pt;font-weight:700;color:#fff}
+.fv span{color:${c.accentColor}}
+
+/* SECTIONS - key: avoid breaks, no repeat headers */
+.sec{margin-bottom:8pt;page-break-inside:avoid;break-inside:avoid}
+.sec table{width:100%;border-collapse:collapse}
+.sec .sh{background:${c.headerBg};padding:0}
+.sh-inner{display:flex;align-items:center;padding:5pt 9pt}
+.sh-pip{width:3pt;height:12pt;background:${c.accentColor};border-radius:1pt;margin-right:7pt;flex-shrink:0}
+.sh-inner span{color:#fff;font-size:8.5pt;font-weight:700;letter-spacing:0.2pt}
+.sec .ch td{padding:3pt 9pt;font-size:5.5pt;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.7pt;border-bottom:1.5pt solid ${c.accentColor};background:#f8f9fb}
+.sec .cs{padding:4pt 9pt;font-family:'Courier New',monospace;font-size:7pt;color:#475569;border-bottom:0.5pt solid #eef1f5}
+.sec .cn{padding:4pt 9pt;font-size:7.5pt;color:#1e293b;border-bottom:0.5pt solid #eef1f5}
+.sec .cv{padding:4pt 9pt;text-align:right;font-size:7.5pt;font-weight:600;color:#1e293b;border-bottom:0.5pt solid #eef1f5}
+.sec .cc{color:${c.commissionColor};font-weight:700}
+.sec .cn2{font-weight:800;color:${c.primaryColor}}
+
+.gov{margin-top:10pt;display:flex;font-size:6pt;color:#94a3b8;line-height:1.4}
+.gov-bar{width:2.5pt;background:${c.accentColor};flex-shrink:0}
+.gov-txt{padding:5pt 8pt;background:#f8f9fb;flex:1}
+
+.ftr{margin-top:8pt;padding-top:5pt;border-top:0.5pt solid #e2e8f0;display:flex;justify-content:space-between;font-size:6pt;color:#cbd5e1}
+
+.bbar{display:flex;height:3pt}
+.bbar div:nth-child(1){flex:1;background:${c.primaryColor}}
+.bbar div:nth-child(2){flex:1;background:${c.accentColor}}
+.bbar div:nth-child(3){flex:1;background:${c.primaryColor}}
+
+@media screen{
+  body{background:#1a1f2e}
+  .tb{background:${c.primaryColor};padding:10px 20px;text-align:center;position:sticky;top:0;z-index:100;border-bottom:2px solid ${c.accentColor};font-family:'Inter',sans-serif}
+  .tb button{font-family:'Inter',sans-serif;border-radius:3px;cursor:pointer;font-size:12px;font-weight:700;padding:8px 22px;margin:0 4px}
+  .tb .pb{background:${c.accentColor};color:${c.primaryColor};border:none}
+  .tb .cb{background:transparent;color:#94a3b8;border:1px solid #475569}
+  .tb .tip{font-size:11px;color:${c.accentColor};margin:0 10px}
+  .tb .tip b{color:#fff}
+  .doc{width:8.5in;margin:16px auto;background:#fff;box-shadow:0 2px 30px rgba(0,0,0,0.5);overflow:hidden}
 }
-@media print {
-  .toolbar { display:none !important; }
-  .doc { width:auto; margin:0; box-shadow:none; }
-  .doc-body { padding:0 0.5in 0.4in 0.5in; }
+@media print{
+  .tb{display:none!important}
+  .doc{width:auto;margin:0;box-shadow:none}
 }
 </style>
 </head>
 <body>
-<div class="toolbar">
-  <button class="pb" onclick="window.print()">\u25B6\u2002Save as PDF</button>
-  <span class="tip"><b>Tip:</b> Set Margins \u2192 <b>None</b>, uncheck <b>\u201CHeaders and footers\u201D</b></span>
+<div class="tb">
+  <button class="pb" onclick="window.print()">\u25B6 Save as PDF</button>
+  <span class="tip"><b>Tip:</b> Margins \u2192 <b>None</b>, uncheck <b>Headers &amp; footers</b></span>
   <button class="cb" onclick="window.close()">Close</button>
 </div>
-
 <div class="doc">
-  <!-- Header -->
-  <table cellspacing="0" cellpadding="0" style="width:100%"><tr><td style="padding:0">
-    <table cellspacing="0" cellpadding="0" style="width:100%;background:${c.primaryColor}">
-      <tr><td colspan="3" style="height:3pt;background:${c.accentColor};font-size:0;line-height:0">&nbsp;</td></tr>
-      <tr><td style="padding:22pt 0.5in 18pt;text-align:center">
-        <div style="font-size:6.5pt;font-weight:700;letter-spacing:3pt;color:${c.accentColor};text-transform:uppercase;margin-bottom:5pt">\u2605\u2002${c.badge}\u2002\u2605</div>
-        <div style="font-size:17pt;font-weight:900;color:#fff;letter-spacing:0.4pt;line-height:1.15">${c.companyName}</div>
-        <table cellspacing="0" cellpadding="0" style="margin:6pt auto"><tr><td style="width:40pt;height:1.5pt;background:${c.accentColor}"></td></tr></table>
-        <div style="font-size:9.5pt;color:${c.accentColor};font-weight:700;letter-spacing:0.6pt;margin-top:3pt">${c.title}</div>
-        <div style="font-size:7.5pt;color:#94a3b8;margin-top:2pt">${c.subtitle}</div>
-      </td></tr>
-    </table>
-  </td></tr></table>
-
-  <!-- Info bar -->
-  <table cellspacing="0" cellpadding="0" style="width:100%;background:#f8f9fb;border-bottom:1px solid #e2e8f0"><tr>
-    <td style="padding:4pt 0.5in;font-size:6.5pt;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.4pt">Confidential \u2022 For Authorized Partners Only</td>
-    <td style="padding:4pt 0.5in;font-size:6.5pt;color:#94a3b8;text-align:right">${today}</td>
-  </tr></table>
-
-  <!-- Body -->
-  <div class="doc-body" style="padding-top:12pt">
-    ${formulaBox}
-    ${sectionsHTML}
-
-    ${c.showGovernance ? `<table cellspacing="0" cellpadding="0" style="width:100%;margin-top:12pt"><tr>
-      <td style="width:3pt;background:${c.accentColor}"></td>
-      <td style="padding:7pt 10pt;background:#f8f9fb;font-size:6.5pt;color:#94a3b8;line-height:1.5">${c.governanceStatement}</td>
-    </tr></table>` : ''}
-
-    <table cellspacing="0" cellpadding="0" style="width:100%;margin-top:10pt;border-top:0.5pt solid #e2e8f0"><tr>
-      <td style="padding:6pt 0;font-size:6.5pt;color:#cbd5e1">${c.footerText}</td>
-      <td style="padding:6pt 0;font-size:6.5pt;color:#cbd5e1;text-align:right">${c.sections.length} categories \u2022 ${totalItems} items</td>
-    </tr></table>
+  <div class="hdr">
+    <div class="bar"></div>
+    <div class="badge">\u2605 ${c.badge} \u2605</div>
+    <div class="co">${c.companyName}</div>
+    <div class="rule"></div>
+    <div class="ti">${c.title}</div>
+    <div class="su">${c.subtitle}</div>
   </div>
-
-  <!-- Bottom bar -->
-  <table cellspacing="0" cellpadding="0" style="width:100%"><tr>
-    <td style="height:4pt;background:${c.primaryColor};width:33%"></td>
-    <td style="height:4pt;background:${c.accentColor};width:34%"></td>
-    <td style="height:4pt;background:${c.primaryColor};width:33%"></td>
-  </tr></table>
+  <div class="meta"><span>Confidential \u2022 Authorized Partners Only</span><span>${today}</span></div>
+  <div class="body">
+    ${formulaHTML}
+    ${sectionsHTML}
+    ${c.showGovernance ? `<div class="gov"><div class="gov-bar"></div><div class="gov-txt">${c.governanceStatement}</div></div>` : ''}
+    <div class="ftr"><span>${c.footerText}</span><span>${c.sections.length} categories \u2022 ${totalItems} items</span></div>
+  </div>
+  <div class="bbar"><div></div><div></div><div></div></div>
 </div>
 </body>
 </html>`;
